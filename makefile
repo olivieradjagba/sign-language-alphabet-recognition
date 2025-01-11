@@ -4,17 +4,18 @@ PY = $(VENV)/bin/python # Using this as the virtual environment cannot be activa
 PIP = $(VENV)/bin/pip # Same as above
 
 MAIN = main.py
+SRC = src
 DATA_DIR = assets
 DATA_ZIP = asl-dataset.zip
 DATA = asl-dataset
-SRC = src
+MODEL_DIR = models
 
 file ?= $(SRC)/$(MAIN)
 
-setup: dirs venv data ## Create the directories, a virtual environment
+setup: dirs $(VENV) # data ## Create the directories, a virtual environment
 
 dirs: ## Create the directories
-	@mkdir -p $(SRC) $(DATA_DIR)
+	@mkdir -p $(SRC) $(DATA_DIR) $(MODEL_DIR)
 
 run: | $(SRC) ## Run the application
 	@$(PY) $(file)
@@ -34,13 +35,16 @@ $(VENV): ## Create if it doesn't exist and activate a virtual environment. Use s
 data: | $(DATA_DIR)  ## Download the data
 	@if [ ! -d "$(DATA_DIR)/$(DATA)" ]; then \
 		echo "Downloading the data..."; \
-		cd $(DATA_DIR) && curl -O 'https://www.kaggle.com/api/v1/datasets/download/ayuraj/asl-dataset'; \
+		curl -L -o $(DATA_DIR)/$(DATA_ZIP) 'https://www.kaggle.com/api/v1/datasets/download/ayuraj/asl-dataset'; \
 		echo "Unzipping the data..."; \
 		cd $(DATA_DIR) && @unzip $(DATA_ZIP); \
 		echo "Data downloaded and unzipped at '$(DATA_DIR)/$(DATA)'."; \
 	else \
 		echo "Data already exists at '$(DATA_DIR)/$(DATA)'."; \
 	fi
+
+# pythonpath: ## Set the PYTHONPATH
+# 	@export PYTHONPATH="$(shell pwd):$(PYTHONPATH)"
 	
 help: ## Show help
 	@awk 'BEGIN {FS = ":.*##"; printf "\nUsage:\n  make [target]\033[36m\033[0m\n"} /^[a-zA-Z_-]+:.*?##/ { printf "  \033[36m%-15s\033[0m %s\n", $$1, $$2 } /^##@/ { printf "\n\033[1m%s\033[0m\n", substr($$0, 5) } ' $(MAKEFILE_LIST)

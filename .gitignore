@@ -162,7 +162,7 @@ cython_debug/
 #.idea/
 
 # Added
-*.vscode/
-.vscode/
+# *.vscode/
+# .vscode/
 assets/
 models/

@@ -7,27 +7,29 @@ from torchvision import datasets, transforms
 class DataPreprocessor:
     def __init__(self,
                  data_dir:str,
-                 transform=None,
-                 input_shape:tuple[int, int]=(224, 224),
-                 train_ratio=0.7,
-                 val_ratio=0.15,
-                 test_ratio=0.15,
-                 batch_size=32):
+                 transform:transforms.Compose=None,
+                 resize_shape:tuple[int,int]=(224, 224),
+                 train_ratio:float=0.7,
+                 val_ratio:float=0.15,
+                 test_ratio:float=0.15,
+                 batch_size:int=32):
         """
         Initialize the DataPreprocessor.
 
         Args:
             data_dir (str): Path to the dataset directory.
             transform (torchvision.transforms.Compose): Transformations to apply to the images.
+            resize_shape (tuple[int,int]): Shape to resize the input images to.
             train_ratio (float): Proportion of data to use for training.
             val_ratio (float): Proportion of data to use for validation.
             test_ratio (float): Proportion of data to use for testing.
             batch_size (int): Batch size for DataLoader.
         """
         assert train_ratio + val_ratio + test_ratio == 1.0, "Ratios must sum to 1."
+        
         self.data_dir = data_dir
-        self.transform = transform if transform else transforms.Compose([
-            transforms.Resize(input_shape),
+        self.transform = transform or transforms.Compose([
+            transforms.Resize(resize_shape),
             transforms.ToTensor(),
             transforms.Normalize((0,),(1,))
         ])
@@ -36,7 +38,7 @@ class DataPreprocessor:
         self.test_ratio = test_ratio
         self.batch_size = batch_size
 
-    def preprocess(self):
+    def preprocess(self) -> tuple[DataLoader, DataLoader, DataLoader]:
         """
         Process the data into train, validation, and test splits.
 
