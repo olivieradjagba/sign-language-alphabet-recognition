@@ -1,8 +1,24 @@
-numpy
-matplotlib
-seaborn
+# Add the PyTorch nightly CPU build index
+--extra-index-url https://download.pytorch.org/whl/nightly/cpu
+
+# PyTorch packages (from the specified index)
 torch
 torchvision
+torchaudio
+
+# Additional utilities
 torchsummary
+
+# Other packages (from PyPI)
+numpy
+pandas
+matplotlib
+seaborn
 opencv-python
 scikit-learn
+transformers
+datasets
+
+ipykernel
+jupyter
+jupyterlab

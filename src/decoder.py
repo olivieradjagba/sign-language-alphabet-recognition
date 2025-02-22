@@ -1,7 +1,7 @@
 import torch
 import torch.nn as nn
 
-from transformer_layers import DecoderLayer
+from src.layers import DecoderLayer
 
 class SequentialDecoder(nn.Sequential):
     def forward(self, *inputs) -> torch.Tensor:
@@ -17,5 +17,5 @@ class Decoder(nn.Module):
         self.layers = SequentialDecoder(*[DecoderLayer(d_model, ffn_hidden_size, num_heads, num_patches, drop_prob) for _ in range(num_layers)])
     
     def forward(self, x:torch.Tensor, y:torch.Tensor, mask:torch.Tensor) -> torch.Tensor:
-        x = self.layers(x, y, mask)
-        return x
+        y = self.layers(x, y, mask)
+        return y

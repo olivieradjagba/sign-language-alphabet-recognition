@@ -1,5 +1,5 @@
 VENV = .venv
-PYTHON = /opt/homebrew/bin/python3.12
+PYTHON = /opt/homebrew/bin/python3.13
 PY = $(VENV)/bin/python # Using this as the virtual environment cannot be activated in from the makefile
 PIP = $(VENV)/bin/pip # Same as above
 
@@ -23,11 +23,14 @@ run: | $(SRC) ## Run the application
 install: requirements.txt ## Install dependencies
 	@$(PIP) install -r $<
 
+uninstall: ## Uninstall dependencies
+	@$(PIP) freeze | xargs pip uninstall -y
+
 freeze: ## Freeze the dependencies
 	@$(PIP) freeze > requirements.txt
 
-$(VENV): ## Create if it doesn't exist and activate a virtual environment. Use source $(VENV)/bin/activate to activate it.
-	@$(PYTHON) -m venv $@
+venv: ## Create if it doesn't exist and activate a virtual environment. Use source $(VENV)/bin/activate to activate it.
+	@$(PYTHON) -m venv $(VENV)
 	@echo "Virtual environment created."
 
 # curl -L -o ~/Downloads/asl-dataset.zip\
@@ -50,4 +53,7 @@ help: ## Show help
 	@awk 'BEGIN {FS = ":.*##"; printf "\nUsage:\n  make [target]\033[36m\033[0m\n"} /^[a-zA-Z_-]+:.*?##/ { printf "  \033[36m%-15s\033[0m %s\n", $$1, $$2 } /^##@/ { printf "\n\033[1m%s\033[0m\n", substr($$0, 5) } ' $(MAKEFILE_LIST)
 
 clean:
-	rm -rf $(VENV)
+	@rm -rf $(VENV)
+
+clear-cache: ## Clear the pip cache
+	@pip cache purge

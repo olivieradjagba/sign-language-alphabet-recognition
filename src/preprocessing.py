@@ -1,6 +1,6 @@
 from sklearn.model_selection import train_test_split
 
-import torch
+# import torch
 from torch.utils.data import DataLoader, Subset
 from torchvision import datasets, transforms
 

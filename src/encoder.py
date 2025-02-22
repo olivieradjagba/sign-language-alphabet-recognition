@@ -1,7 +1,7 @@
 import torch
 import torch.nn as nn
 
-from transformer_layers import EncoderLayer
+from src.layers import EncoderLayer
 
 class Encoder(nn.Module):
     def __init__(self, d_model:int, ffn_hidden_size:int, num_heads:int, num_layers:int, drop_prob:float):

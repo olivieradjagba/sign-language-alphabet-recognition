@@ -1,4 +1,4 @@
-import numpy as np
+# import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
 import seaborn as sns
@@ -7,11 +7,13 @@ from sklearn.metrics import confusion_matrix
 import torch
 from torch import nn, optim
 from torch.utils.data import DataLoader
+from torch.nn.utils import clip_grad_norm_
 
 class SignLanguageModelTrainer:
     def __init__(self,
                  model:nn.Module,
                  classes:list[str],
+                 init_model:bool=True,
                  save_path:str=None,
                  device:torch.device=torch.device("cpu")):
         """
@@ -23,16 +25,28 @@ class SignLanguageModelTrainer:
             device (torch.device): Device to run the model on.
         """
         self.model = model.to(device)
+        if init_model:
+            self.__init_model()
         self.classes = classes
         self.save_path = save_path
         self.device = device
 
+    def __init_model(self) -> None:
+        # Initialize the model with Xavier initialization
+        for p in self.model.parameters():
+            if p.dim() > 1:
+                nn.init.xavier_uniform_(p)
+                
     def train(self,
               train:DataLoader,
               val:DataLoader,
-              criterion:nn.modules.loss._Loss,
+              train_criterion:nn.modules.loss._Loss,
+              val_criterion:nn.modules.loss._Loss,
               optimizer:optim.Optimizer,
+              scheduler:optim.lr_scheduler._LRScheduler=None,
               epochs:int=10,
+              patience:int=5,
+              print_every:int=1,
               save_best:bool=False
     ) -> tuple[list[float], list[float]]:
         """
@@ -52,6 +66,7 @@ class SignLanguageModelTrainer:
 
         train_losses, val_losses = [], []
         best_val_loss = float('inf')  # Track the best validation loss
+        early_stopping_counter = 0
         
         for epoch in range(epochs):
             self.model.train()
@@ -61,32 +76,51 @@ class SignLanguageModelTrainer:
 
                 optimizer.zero_grad()
                 outputs = self.model(inputs)
-                loss = criterion(outputs, labels)
+                loss = train_criterion(outputs, labels)
+                # print(loss.item())
+                # Backpropagation
                 loss.backward()
+                # Gradient clipping
+                clip_grad_norm_(self.model.parameters(), max_norm=1.0)
+                # Update weights
                 optimizer.step()
 
                 train_loss += loss.item()
                 
             train_loss /= len(train)
-            val_loss = self.evaluate(val, criterion, is_test=False)
+            val_loss = self.evaluate(val, val_criterion, is_test=False)
             
             # Save losses
             train_losses.append(train_loss)
             val_losses.append(val_loss)
             
-            print(f"Epoch {epoch+1}/{epochs}, Train Loss: {train_losses[-1]:.4f}, Val Loss: {val_losses[-1]:.4f}")
-            
-            if save_best and val_loss < best_val_loss:
+            if epoch == 0 or (epoch+1) % print_every == 0:
+                print(f"Epoch [{epoch+1:>3}/{epochs}] Loss: {train_loss:.5f} | Val loss: {val_loss:.5f}",
+                      f"| LR: {scheduler.get_last_lr()[0]:.6f}" if scheduler is not None else "",
+                      f"-- Best model {'saved' if save_best else ''}" if val_loss < best_val_loss
+                      else f"-- Best val loss: {best_val_loss:.5f} | Patience: {early_stopping_counter+1}/{patience}")
+                
+            if val_loss < best_val_loss:
                 best_val_loss = val_loss
-                self.save_model(self.save_path)
-                print(f"New best model saved with loss: {best_val_loss:.4f}")
+                early_stopping_counter = 0
+                if save_best:
+                    self.save_model(self.save_path)
+            else:
+                early_stopping_counter += 1
+                if early_stopping_counter >= patience:
+                    print(f"Early stopping after epoch {epoch+1}")
+                    break
+                
+            # Update learning rate
+            if scheduler is not None:
+                scheduler.step()
 
         if save_best:
             self.load_model()
         
         return train_losses, val_losses
 
-    def evaluate(self, val:DataLoader, criterion:nn.modules.loss._Loss=None, is_test:bool=False) -> float:
+    def evaluate(self, val:DataLoader, criterion:nn.modules.loss._Loss=None, is_test:bool=False) -> float | tuple[float, list[int], list[int]]:
         """
         Evaluate the model on validation data.
 
