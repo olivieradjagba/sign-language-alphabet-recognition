@@ -5,7 +5,7 @@ import numpy as np
 import torch
 import torch.nn as nn
 
-from src.helpers import scaled_dot_product_attention
+from src.utils import scaled_dot_product_attention
     
 class MultiHeadAttention(nn.Module):
     def __init__(self, d_model:int, num_heads:int):

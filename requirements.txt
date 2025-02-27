@@ -7,7 +7,7 @@ torchvision
 torchaudio
 
 # Additional utilities
-torchsummary
+torchinfo
 
 # Other packages (from PyPI)
 numpy
