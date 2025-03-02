@@ -4,7 +4,7 @@
 
 Sign language is a crucial mode of communication for the deaf and hard-of-hearing community. It enables individuals to express themselves through hand gestures, facial expressions, and body movements. However, there is still a communication gap between sign language users and those unfamiliar with it. Automated sign language recognition using deep learning can help bridge this gap by enabling real-time translation into text or speech.
 
-This project aims to classify sign language alphabets and digits using three different deep learning models: a Convolutional Neural Network (CNN), a Transfer Learning model based on ResNet, and a Vision Transformer (ViT) model built from scratch. By comparing their performance, we aim to identify the most effective approach for sign language classification and also explore the power of these deep learning architecture.
+This project aims to classify sign language alphabets and digits using three different deep learning models: a Convolutional Neural Network (CNN), a Transfer Learning model based on ResNet18, and a Vision Transformer (ViT) model built from scratch. By comparing their performance, we aim to identify the most effective approach for sign language classification.
 
 ## Models Overview
 
@@ -12,23 +12,27 @@ This project aims to classify sign language alphabets and digits using three dif
 
 A Convolutional Neural Network (CNN) was developed from scratch to extract spatial features from sign language images. CNNs are particularly effective for image classification tasks due to their hierarchical feature extraction capabilities.
 
-### 2. Transfer Learning with ResNet
+### 2. Transfer Learning with ResNet18
 
-This model utilizes a pre-trained ResNet architecture, leveraging its feature extraction capabilities to improve classification performance. Transfer learning allows the model to benefit from features learned on large-scale datasets, making training more efficient and effective.
+This model utilizes a pre-trained ResNet18 architecture with modifications to the fully connected layer to adapt to our classification task. We fully trained this model as it is relatively small yet effective for our case.
 
 ### 3. Vision Transformer (ViT)
 
 A Vision Transformer (ViT) model was implemented from scratch to explore the potential of transformer-based architectures in image classification. Unlike CNNs, ViTs process images as sequences of patches, capturing global dependencies more effectively.
 
+## Training Setup
+
+All models were trained on a MacBook Pro M3's GPU (Metal). Training was conducted for a maximum of 100 epochs with an early stopping patience value of 20 epochs, meaning training was halted if no improvement was observed within 20 epochs after the last improvement. The number of epochs listed for each model includes these 20 patience epochs.
+
 ## Model Performance
 
 The table below summarizes the performance of each model, including accuracy, number of epochs required to achieve it, and total training time.
 
-| Model Type                 | Accuracy | Epochs | Training Time |
-| -------------------------- | -------- | ------ | ------------- |
-| CNN                        | XX%      | XX     | XX minutes    |
-| ResNet (Transfer Learning) | XX%      | XX     | XX minutes    |
-| Vision Transformer         | XX%      | XX     | XX minutes    |
+| Model Type                   | Accuracy | Epochs | Training Time |
+| ---------------------------- | -------- | ------ | ------------- |
+| CNN                          | 98.94%   | 64     | 9min 6s       |
+| ResNet18 (Transfer Learning) | 97.62%   | 39     | 8min 2s       |
+| Vision Transformer           | 96.83%   | 81     | 19min 18s     |
 
 ## Confusion Matrices
 
@@ -36,30 +40,74 @@ Below are the confusion matrices for each model, providing insights into their c
 
 ### CNN Model Confusion Matrix
 
-```
-[Insert confusion matrix here]
-```
+![CNN confusion matrix](assets/outputs/cm_cnn_98.94.png)
 
-### ResNet Model Confusion Matrix
+### ResNet18 Model Confusion Matrix
 
-```
-[Insert confusion matrix here]
-```
+![TL confusion matrix](assets/outputs/cm_tl_97.62.png)
 
 ### Vision Transformer Model Confusion Matrix
 
-```
-[Insert confusion matrix here]
-```
+![Insert confusion matrix here](assets/outputs/cm_vit_96.83.png)
 
 ## Conclusion
 
-Based on the evaluation metrics, the best-performing model is **[insert best model]**, which achieved the highest accuracy and efficiency in terms of training time and classification performance. While the CNN model provides a strong baseline, the ResNet model benefits from pre-trained knowledge, and the Vision Transformer explores a novel approach to image recognition. The choice of model depends on the specific requirements, such as computational efficiency or accuracy.
+Based on the evaluation metrics, the best-performing model is **CNN**, which achieved the highest accuracy (98.94%) with relatively low training time. While the CNN model provides a strong baseline, the ResNet18 model benefits from pre-trained knowledge, and the Vision Transformer explores a novel approach to image recognition. However, the ViT model required significantly more training time.
 
 Further improvements could involve hyperparameter tuning, data augmentation, or ensembling multiple models for improved accuracy.
 
-## Running the Code
+---
 
-```
-python src/main.py -t --model_type [cnn,tl,vit] -m --mode [train,test] -s --save [best,last] #-e --epochs [num_epochs] --lr [learning_rate] -p --patience [patience] -f --print_freq [print_freq]
-```
+## Requirements
+
+-   Python 3.13
+-   PyTorch 2.6
+-   GNU Make (optional)
+
+## Running the Model
+
+Follow these steps to set up and run the model:
+
+1. **Run `make setup`** to create the required folders and the virtual environment. If you don’t have GNU Make installed:
+
+    - Manually create a virtual environment (`python3 -m venv .venv`).
+    - Create the following folders at the root of the project:
+        - `assets/models/` (to save trained models).
+        - `assets/outputs/` (to save confusion matrices and loss plots).
+    - Ensure that the Python path in the Makefile is correctly set to your Python interpreter (`python3`).
+
+2. **Activate the virtual environment**:
+
+    ```sh
+    source .venv/bin/activate
+    ```
+
+3. **Install dependencies**:
+
+    ```sh
+    make install
+    ```
+
+    Alternatively, if Make is not installed:
+
+    ```sh
+    pip install -r requirements.txt
+    ```
+
+4. **Run the training or testing script**:
+
+    ```sh
+    python src/main.py -t --model_type [cnn,tl,vit] -m --mode [train,test] -s --save [best,last] -e --epochs [int] -lr --learning_rate [float] -p --patience [int] -f --print_freq [int]
+    ```
+
+    - `-t --model_type` _(Required)_: Choose between `cnn`, `tl` (transfer learning), or `vit`.
+    - `-m --mode` _(Required)_: Set to `train` or `test`.
+    - `-s --save`: Save either the `best` or `last` model.
+    - `-e --epochs`: Number of training epochs.
+    - `-lr --learning_rate`: Set the learning rate.
+    - `-p --patience`: Number of patience epochs for early stopping.
+    - `-f --print_freq`: Frequency of printing logs during training.
+
+    Only the first two parameters (`--model_type` and `--mode`) are required. The default values for the other parameters can be found in the `Config` namespace in `utils.py`.
+
+5. **Enjoy!** 🎉
