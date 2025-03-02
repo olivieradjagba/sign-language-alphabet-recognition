@@ -164,4 +164,5 @@ cython_debug/
 # Added
 # *.vscode/
 # .vscode/
-assets/
+# assets/
+models/
