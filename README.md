@@ -22,11 +22,11 @@ A Vision Transformer (ViT) model was implemented from scratch to explore the pot
 
 ## Training Setup
 
-All models were trained on a MacBook Pro M3's GPU (Metal). Training was conducted for a maximum of 100 epochs with an early stopping patience value of 20 epochs, meaning training was halted if no improvement was observed within 20 epochs after the last improvement. The number of epochs listed for each model includes these 20 patience epochs.
+All models were trained on a MacBook Pro M3's GPU (Metal). Training was conducted for a maximum of 100 epochs with an early stopping patience value of 20 epochs, meaning training was halted if no improvement was observed within 20 epochs after the last improvement.
 
 ## Model Performance
 
-The table below summarizes the performance of each model, including accuracy, number of epochs required to achieve it, and total training time.
+The table below summarizes the performance of each model, including accuracy, number of epochs required to achieve it, and total training time. The number of epochs listed for each model includes the 20 patience epochs.
 
 | Model Type                   | Accuracy | Epochs | Training Time |
 | ---------------------------- | -------- | ------ | ------------- |
@@ -48,7 +48,7 @@ Below are the confusion matrices for each model, providing insights into their c
 
 ### Vision Transformer Model Confusion Matrix
 
-![Insert confusion matrix here](assets/outputs/cm_vit_96.83.png)
+![ViT confusion matrix](assets/outputs/cm_vit_96.83.png)
 
 ## Conclusion
 
@@ -77,6 +77,8 @@ Follow these steps to set up and run the model:
     - Ensure that the Python path in the Makefile is correctly set to your Python interpreter (`python3`).
 
 2. **Activate the virtual environment**:
+
+    If the virtual environment is `.venv`:
 
     ```sh
     source .venv/bin/activate

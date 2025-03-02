@@ -18,7 +18,7 @@ install: requirements.txt ## Install dependencies
 uninstall: ## Uninstall dependencies
 	@$(PIP) freeze | xargs pip uninstall -y
 
-freeze: ## Freeze the dependencies
+freeze: ## Freeze the dependencies 
 	@$(PIP) freeze > requirements.txt
 
 venv: ## Create if it doesn't exist and activate a virtual environment. Use source $(VENV)/bin/activate to activate it.
