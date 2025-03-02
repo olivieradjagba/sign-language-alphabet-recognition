@@ -4,9 +4,7 @@ from seaborn import set_theme
 set_theme(font_scale=0.75)
 
 from torch import nn, optim, manual_seed, backends, mps
-# from torch.optim import lr_scheduler
 # from torchinfo import summary
-# from torchvision import models
 backends.mps.allow_tf32 = True  # Enable TF32 for better performance
 mps.empty_cache()  # Clear unused memory
 
@@ -60,17 +58,14 @@ def main():
             if model_type == 'vit' else optim.lr_scheduler.ReduceLROnPlateau(optimizer, mode=Config.STEP_MODE[Config.STEP_METRIC],
                                                                             factor=Config.STEP_FACTOR, patience=Config.STEP_AFTER, min_lr=1e-5)
 
-        train_losses, val_losses = trainer.train(train,
-                                                 val,
-                                                 train_criterion,
-                                                 val_criterion,
+        train_losses, val_losses = trainer.train(train, val,
+                                                 train_criterion, val_criterion,
                                                  optimizer,
                                                  scheduler = scheduler,
                                                  epochs = Config.EPOCHS, 
                                                  patience = Config.PATIENCE,
                                                  print_every = Config.PRINT_EVERY,
                                                  step_per = Config.STEP_PER[model_type],
-                                                 step_after = Config.STEP_AFTER,
                                                  step_metric= Config.STEP_METRIC,
                                                  save = Config.SAVE_MODEL)
 

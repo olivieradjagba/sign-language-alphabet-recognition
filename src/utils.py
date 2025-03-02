@@ -2,7 +2,7 @@ import math
 
 import torch
 import torch.nn.functional as F
-from torch import nn, optim
+from torch import optim
 from torch.utils.data import Dataset, DataLoader
 from torchvision import transforms, models
 
@@ -59,7 +59,21 @@ class Config:
 
 
 # Attention
-def scaled_dot_product_attention(q:torch.Tensor, k:torch.Tensor, v:torch.Tensor, mask:torch.Tensor=None) -> tuple[torch.Tensor, torch.Tensor]:
+def scaled_dot_product_attention(q:torch.Tensor,
+                                 k:torch.Tensor,
+                                 v:torch.Tensor,
+                                 mask:torch.Tensor=None
+                            ) -> tuple[torch.Tensor, torch.Tensor]:
+    """
+    Applies scaled dot-product attention.
+    Args:
+        q (torch.Tensor): Query tensor.
+        k (torch.Tensor): Key tensor.
+        v (torch.Tensor): Value tensor.
+        mask (torch.Tensor): Mask tensor.
+    Returns:
+        tuple[torch.Tensor, torch.Tensor]: Output tensor and attention weights.
+    """
     d_k = q.shape[-1]
     scaled = q @ k.transpose(-2, -1) / math.sqrt(d_k)
     if mask is not None:
@@ -72,12 +86,22 @@ def scaled_dot_product_attention(q:torch.Tensor, k:torch.Tensor, v:torch.Tensor,
 
 # Performance
 class Scheduler(optim.lr_scheduler._LRScheduler):
+    """
+    Learning rate scheduler for the Vision Transformer model.
+    """
     def __init__(self, 
                  optimizer: optim.Optimizer,
                  dim_embed: int,
                  warmup_steps: int,
                  last_epoch: int=-1):
-
+        """
+        Initialize the scheduler.
+        Args:
+            optimizer (optim.Optimizer): Optimizer.
+            dim_embed (int): Embedding dimension.
+            warmup_steps (int): Warmup steps.
+            last_epoch (int): Last epoch.
+        """
         self.dim_embed = dim_embed
         self.warmup_steps = warmup_steps
         self.num_param_groups = len(optimizer.param_groups)
@@ -85,17 +109,37 @@ class Scheduler(optim.lr_scheduler._LRScheduler):
         super().__init__(optimizer, last_epoch)#, verbose)
         
     def get_lr(self) -> float:
+        """
+        Get the learning rate.
+        Returns:
+            float: Learning rate.
+        """
         lr = self.calc_lr(self._step_count)
         return [lr] * self.num_param_groups
 
-    def calc_lr(self, step):
+    def calc_lr(self, step) -> float:
+        """
+        Calculate the learning rate.
+        Args:
+            step (int): Step.
+        Returns:
+            float: Learning rate.
+        """
         return self.dim_embed**(-0.5) * min(step**(-0.5), step * self.warmup_steps**(-1.5))
 
 
 
 # Data
 class SignLanguageDataset(Dataset):
+    """
+    Dataset class for the Sign Language dataset.
+    """
     def __init__(self, dataset: HFDataset) -> None:
+        """
+        Initialize the dataset.
+        Args:
+            dataset (HFDataset): Hugging Face dataset.
+        """
         assert isinstance(dataset, HFDataset), "Dataset must be a Hugging Face Dataset object"
         self.dataset = dataset
 
@@ -107,19 +151,20 @@ class SignLanguageDataset(Dataset):
         return (item["image"], item["label"])
 
 class DataPreprocessor:
+    """
+    Data preprocessor for the Sign Language dataset.
+    """
     def __init__(self,
                  path:str,
                  transform:transforms.Compose=None,
                  resize_shape:tuple[int,int]=(224, 224)):
         """
         Initialize the DataPreprocessor.
-
         Args:
             path (str): Path to the huggingface dataset.
             transform (torchvision.transforms.Compose): Transformations to apply to the images.
             resize_shape (tuple[int,int]): Shape to resize the input images to.
         """
-        
         self.dataset = load_dataset(path, split="train")
         self.classes = self.dataset.features["label"].names
         
@@ -141,7 +186,6 @@ class DataPreprocessor:
             ) -> tuple[DataLoader, DataLoader] | tuple[DataLoader, DataLoader, DataLoader]:
         """
         Process the data into train, validation, and test splits.
-        
         Args:
             dataset (HFDataset): The dataset to process.
             test_ratio (float): The ratio of the test set.
@@ -149,12 +193,9 @@ class DataPreprocessor:
             batch_size (int): The batch size.
             seed (int): The random seed.
             **kwargs: Additional arguments to pass to the DataLoader.
-
         Returns:
-            tuple: DataLoader objects for train, validation, and test sets.
+            tuple: DataLoader objects for the train, validation (if val_ratio > 0), and test sets.
         """
-
-        # Split the dataset into train, val, and test sets
         dataset = self.split_dataset(dataset or self.dataset, test_ratio=test_ratio, val_ratio=val_ratio, seed=seed)
 
         train = self.dataloader(dataset["train"], batch_size=batch_size, shuffle=True, **kwargs)
@@ -164,13 +205,15 @@ class DataPreprocessor:
         return (train, val, test) if val_ratio > 0 else (train, test)
     
     def dataloader(self, dataset:HFDataset, batch_size:int=32, **kwargs) -> DataLoader:
-        """ Create a DataLoader for a Hugging Face Dataset object\n
+        """
+        Create a DataLoader for a Hugging Face Dataset object.
         Args:
             dataset (HFDataset): The dataset to create a DataLoader for
             batch_size (int): The batch size
             **kwargs: Additional arguments to pass to the DataLoader
         Returns:
-            DataLoader: A DataLoader for the dataset"""
+            DataLoader: A DataLoader for the dataset.
+        """
         return DataLoader(SignLanguageDataset(dataset), batch_size=batch_size, num_workers=Config.NB_WORKERS, **kwargs)
     
     def split_dataset(self,
@@ -179,7 +222,16 @@ class DataPreprocessor:
                       val_ratio:float=0.0,
                       seed:int=42
             ) -> DatasetDict:
-        
+        """
+        Split a dataset into train, validation, and test sets
+        Args:
+            dataset (HFDataset): The dataset to split
+            test_ratio (float): The ratio of the test set
+            val_ratio (float): The ratio of the validation set
+            seed (int): The random seed
+        Returns:
+            DatasetDict: A DatasetDict object containing the train, validation (if val_ratio > 0), and test sets
+        """
         assert isinstance(dataset, HFDataset), "Dataset must be a Hugging Face DatasetDict object"
         
         train_test = dataset.train_test_split(test_size=test_ratio, stratify_by_column="label", seed=seed)
@@ -197,14 +249,17 @@ class DataPreprocessor:
         return dataset_dict
     
     def apply_transform(self, batch:dict) -> dict:
-        """ Apply the transformation to a batch of images\n
+        """
+        Apply the transformation to a batch of images
         Args:
             batch (torch.Tensor): The batch of images to transform
         Returns:
-            torch.Tensor: The transformed batch"""
-            
+            torch.Tensor: The transformed batch
+        """
         return {'image': [self.transform(item) for item in batch['image']]}
     
     def clear_cache(self) -> None:
-        """ Clear the cache of all Hugging Face datasets"""
+        """
+        Clear the cache of all Hugging Face datasets
+        """
         self.dataset.cleanup_cache_files()

@@ -17,6 +17,9 @@ from src.models import SignLanguageCNN, SignLanguageTL, SignLanguageViT
 from src.utils import Config
 
 class SignLanguageModelTrainer:
+    """
+    Trainer class for training and evaluating the different models.
+    """
     def __init__(self,
                  model:nn.Module,
                  classes:list[str],
@@ -25,9 +28,10 @@ class SignLanguageModelTrainer:
                  device:torch.device=torch.device("cpu")):
         """
         Initialize the ResNet model for fine-tuning.
-
         Args:
             model (nn.Module): The ResNet model.
+            classes (list): List of class names.
+            init_model (bool): Whether to initialize the model parameters.
             save_path (str): Path to save the model.
             device (torch.device): Device to run the model on.
         """
@@ -39,7 +43,9 @@ class SignLanguageModelTrainer:
         self.device = device
 
     def __init_model(self) -> None:
-        # Initialize the model with Xavier initialization
+        """
+        Initialize the model parameters with Xavier initialization.
+        """
         for p in self.model.parameters():
             if p.dim() > 1:
                 nn.init.xavier_uniform_(p)
@@ -54,25 +60,28 @@ class SignLanguageModelTrainer:
               epochs:int=10,
               patience:int=None,
               print_every:int=1,
-              step_per:Literal['epoch','batch','metric']='epoch',
-              step_after:int=5, # Step after this #epoch without improvement when step_per = 'metric'
+              step_per:Literal['epoch','batch']='epoch',
               step_metric:Literal['loss','accuracy']='loss',
               save:Literal['best','last']=None
     ) -> tuple[list[float], list[float]]:
         """
         Train the model.
-
         Args:
             train (DataLoader): Training data loader.
             val (DataLoader): Validation data loader.
-            criterion (_Loss): Loss function.
+            train_criterion (_Loss): Training loss function.
+            val_criterion (_Loss): Validation loss function.
+            optimizer (Optimizer): Optimizer.
+            scheduler (LRScheduler): Learning rate scheduler.
             epochs (int): Number of training epochs.
-            save_best (bool): Save the best model.
-            
+            patience (int): Patience for early stopping.
+            print_every (int): Print loss every n epochs.
+            step_per (Literal['epoch','batch']): Step learning rate scheduler after per epoch, batch.
+            step_metric (Literal['loss','accuracy']): Metric to use for learning rate scheduler if it's a ReduceLROnPlateau.
+            save (Literal['best','last']): Save the best or last model.
         Returns:
             tuple[list[float], list[float]]: Training and validation losses.
         """
-        # assert save_best and self.save_path or not save_best, "Save path must be provided if save_best is True."
         assert save and self.save_path or not save, "Save path must be provided if save_best is True."
 
         train_losses, val_losses = [], []
@@ -82,7 +91,7 @@ class SignLanguageModelTrainer:
         t = time()
         
         print(f"Training {self.model.__class__.__name__} model using: epochs={epochs} --",
-              f"patience={patience} -- print_every={print_every} -- step_per={step_per} -- step_after={step_after}")
+              f"patience={patience} -- print_every={print_every} -- step_per={step_per}")
         
         for epoch in range(epochs):
             self.model.train()
@@ -146,12 +155,6 @@ class SignLanguageModelTrainer:
                 if patience is not None and early_stopping_counter >= patience:
                     print(f"Early stopping after epoch {epoch+1}")
                     break
-                if scheduler is not None and step_per == 'metric' and early_stopping_counter % step_after == 0:
-                    if type(scheduler) == optim.lr_scheduler.ReduceLROnPlateau:
-                        scheduler.step(val_loss if step_metric == 'loss' else acc)
-                    else:
-                        scheduler.step()
-
         if save == 'last':
             self.save_model(self.save_path)
         elif save == 'best':
@@ -168,10 +171,14 @@ class SignLanguageModelTrainer:
                  is_test:bool=False
             ) -> tuple[float, float] | tuple[float, list[int], list[int]]:
         """
-        Evaluate the model on validation data.
-
+        Evaluate the model.
         Args:
             val (DataLoader): Validation data loader.
+            criterion (_Loss): Loss function.
+            is_test (bool): Whether to evaluate on test data.
+        Returns:
+            tuple[float, float] | tuple[float, list[int], list[int]]: Accuracy and loss (if is_test is False)
+            or true labels and predicted labels otherwise.
         """
         assert not is_test and criterion or is_test, "Criterion must be provided for evaluation."
         
@@ -197,21 +204,28 @@ class SignLanguageModelTrainer:
         return (acc, y_true, y_pred) if is_test else (acc, val_loss)
     
     def predict(self, input:torch.Tensor) -> str:
+        """
+        Predict the class of an input
+        Args:
+            input (torch.Tensor): Input image tensor.
+        Returns:
+            str: Predicted class.
+        """
+        self.model.to(self.device)
+        input = input.to(self.device)
         self.model.eval()
         with torch.no_grad():
             output = self.model(input)
-            _, pred_idx = torch.max(output, 1).item()
+            pred_idx = torch.argmax(output, 1).item()
             return self.classes[pred_idx]
     
     def confusion_matrix(self, y_true:torch.Tensor, y_pred:torch.Tensor, num_classes:int) -> torch.Tensor:
         """
         Computes the confusion matrix for a multi-class classification problem.
-
         Args:
             y_true (torch.Tensor): Ground truth labels (1D tensor of size N).
             y_pred (torch.Tensor): Predicted labels (1D tensor of size N).
             num_classes (int): Number of classes.
-
         Returns:
             torch.Tensor: Confusion matrix of shape (num_classes, num_classes).
         """
@@ -235,13 +249,16 @@ class SignLanguageModelTrainer:
                               **kwargs) -> None:
         """
         Plots the confusion matrix as a heatmap.
-
         Args:
             y_true (torch.Tensor): Ground truth labels (1D tensor of size N).
             y_pred (torch.Tensor): Predicted labels (1D tensor of size N).
             classes (list): List of class names corresponding to the indices in the matrix.
             normalize (bool): Whether to normalize the confusion matrix to percentages.
             figsize (tuple): Figure size.
+            model_type (str): Model type.
+            accuracy (float): Model accuracy.
+            save_dir (str): Directory to save the confusion matrix plot.
+            show (bool): Whether to display the plot.
             **kwargs: Additional arguments to pass to seaborn.
         """
         cm = confusion_matrix(y_true, y_pred)
@@ -265,7 +282,9 @@ class SignLanguageModelTrainer:
     
     def load_model(self, path:str=None) -> None:
         """
-        Load the model from a file. If no path is provided, the model is loaded from the save path.
+        Load the model from a file.
+        Args:
+            path (str): Path to the model file.
         """
         assert path or self.save_path, "Save path must be provided to load the model."
         
@@ -275,6 +294,8 @@ class SignLanguageModelTrainer:
     def save_model(self, path:str=None) -> None:
         """
         Save the model to a file.
+        Args:
+            path (str): Path to save the model.
         """
         assert path or self.save_path, "Save path must be provided to save the model."
         
@@ -288,6 +309,12 @@ class SignLanguageModelTrainer:
                     show:bool=False) -> None:
         """
         Plot the training and validation losses.
+        Args:
+            train_losses (list): List of training losses.
+            val_losses (list): List of validation losses.
+            model_type (str): Model type.
+            save_dir (str): Directory to save the plot.
+            show (bool): Whether to display the plot.
         """
         plt.plot(train_losses, label="train loss")
         plt.plot(val_losses, label="val loss")
@@ -303,10 +330,18 @@ class SignLanguageModelTrainer:
             plt.savefig(os.path.join(save_dir, f"losses_{model_type}_{int(time())}.png"), bbox_inches='tight', dpi=300)
 
 
-def get_trainer(model_type:Literal['cnn', 'tl', 'vit'], classes:list[str]) -> SignLanguageModelTrainer:
+def get_trainer(model_type:Literal['cnn','tl','vit'], classes:list[str]) -> SignLanguageModelTrainer:
+    """
+    Get the model trainer based on the model type.
+    Args:
+        model_type (Literal['cnn','tl','vit']): Model type.
+        classes (list): List of class names.
+    Returns:
+        SignLanguageModelTrainer: Model trainer.
+    """
     num_classes = len(classes)
     if model_type == 'cnn':
-        model = SignLanguageCNN(num_classes)
+        model = SignLanguageCNN(num_classes, Config.NB_CHANNELS)
     elif model_type == 'tl':
         model = SignLanguageTL(num_classes, Config.pretrained_model, Config.weights)
     elif model_type == 'vit':
