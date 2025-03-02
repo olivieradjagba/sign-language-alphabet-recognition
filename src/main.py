@@ -4,9 +4,9 @@ from seaborn import set_theme
 set_theme(font_scale=0.75)
 
 from torch import nn, optim, manual_seed, backends, mps
-from torch.optim import lr_scheduler
+# from torch.optim import lr_scheduler
 # from torchinfo import summary
-from torchvision import models
+# from torchvision import models
 backends.mps.allow_tf32 = True  # Enable TF32 for better performance
 mps.empty_cache()  # Clear unused memory
 
@@ -16,7 +16,7 @@ from src.utils import Config
 manual_seed(Config.SEED)
 
 from src.trainer import get_trainer
-from src.utils import DataPreprocessor, ViTLoss, Scheduler
+from src.utils import DataPreprocessor, Scheduler
 
 def main():
     parser = ArgumentParser(description='Sign Language alphabet and digit recognition')
@@ -52,25 +52,27 @@ def main():
         # summary(trainer.model, input_size=(Config.BATCH_SIZE, Config.NB_CHANNELS, *Config.INPUT_SHAPE),
         #     col_names = ('input_size', 'output_size', 'num_params'), verbose = 0) # from torchinfo
 
-        train_criterion = ViTLoss(label_smoothing=Config.LABEL_SMOOTHING) \
-            if model_type == 'vit' else nn.CrossEntropyLoss()
-        val_criterion = ViTLoss(label_smoothing=0.0) \
-            if model_type == 'vit' else nn.CrossEntropyLoss()
+        train_criterion = nn.CrossEntropyLoss(label_smoothing=Config.LABEL_SMOOTHING[model_type])
+        val_criterion = nn.CrossEntropyLoss()
         optimizer = optim.AdamW(trainer.model.parameters(), betas=Config.BETAS, eps=Config.EPS) \
-            if model_type == 'vit' else optim.Adam(trainer.model.parameters(), lr=Config.LR)
+            if model_type == 'vit' else optim.Adam(trainer.model.parameters(), lr=Config.LR[model_type])
         scheduler = Scheduler(optimizer, Config.D_MODEL, Config.WARMUP_STEPS)\
-            if model_type == 'vit' else None
+            if model_type == 'vit' else optim.lr_scheduler.ReduceLROnPlateau(optimizer, mode=Config.STEP_MODE[Config.STEP_METRIC],
+                                                                            factor=Config.STEP_FACTOR, patience=Config.STEP_AFTER, min_lr=1e-5)
 
         train_losses, val_losses = trainer.train(train,
-                                                val,
-                                                train_criterion,
-                                                val_criterion,
-                                                optimizer,
-                                                scheduler = scheduler,
-                                                epochs = Config.EPOCHS,
-                                                patience = Config.PATIENCE,
-                                                print_every = Config.PRINT_EVERY,
-                                                save = Config.SAVE_MODEL)
+                                                 val,
+                                                 train_criterion,
+                                                 val_criterion,
+                                                 optimizer,
+                                                 scheduler = scheduler,
+                                                 epochs = Config.EPOCHS, 
+                                                 patience = Config.PATIENCE,
+                                                 print_every = Config.PRINT_EVERY,
+                                                 step_per = Config.STEP_PER[model_type],
+                                                 step_after = Config.STEP_AFTER,
+                                                 step_metric= Config.STEP_METRIC,
+                                                 save = Config.SAVE_MODEL)
 
         # Plot the training and validation losses
         trainer.plot_losses(train_losses, val_losses,

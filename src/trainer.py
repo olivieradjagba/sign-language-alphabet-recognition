@@ -56,6 +56,7 @@ class SignLanguageModelTrainer:
               print_every:int=1,
               step_per:Literal['epoch','batch','metric']='epoch',
               step_after:int=5, # Step after this #epoch without improvement when step_per = 'metric'
+              step_metric:Literal['loss','accuracy']='loss',
               save:Literal['best','last']=None
     ) -> tuple[list[float], list[float]]:
         """
@@ -76,7 +77,7 @@ class SignLanguageModelTrainer:
 
         train_losses, val_losses = [], []
         best_val_loss = float('inf')  # Track the best validation loss
-        # best_acc = 0
+        best_acc = 0
         early_stopping_counter = 0
         t = time()
         
@@ -100,16 +101,22 @@ class SignLanguageModelTrainer:
                 optimizer.step()
                 # Update learning rate
                 if scheduler is not None and step_per == 'batch':
-                    scheduler.step()
+                    if type(scheduler) == optim.lr_scheduler.ReduceLROnPlateau:
+                        scheduler.step(val_loss if step_metric == 'loss' else acc)
+                    else:
+                        scheduler.step()
 
                 train_loss += loss.item()
             
             train_loss /= len(train)
-            val_loss = self.evaluate(val, val_criterion, is_test=False)
+            acc, val_loss = self.evaluate(val, val_criterion, is_test=False)
             
             # Update learning rate
             if scheduler is not None and step_per == 'epoch':
-                scheduler.step(val_loss)
+                if type(scheduler) == optim.lr_scheduler.ReduceLROnPlateau:
+                    scheduler.step(val_loss if step_metric == 'loss' else acc)
+                else:
+                    scheduler.step()
                 
             
             # Save losses
@@ -117,20 +124,21 @@ class SignLanguageModelTrainer:
             val_losses.append(val_loss)
             
             if epoch == 0 or (epoch+1) % print_every == 0:
-                print(f"Epoch [{epoch+1:>3}/{epochs}] Loss: {train_loss:.5f} | Val loss: {val_loss:.5f}",
-                      f" | LR: {scheduler.get_last_lr()[0]:.6f}" if scheduler is not None else "",
-                      f" -- Best model {'saved' if save=='best' else ''}" if val_loss < best_val_loss
-                      else f" -- Best val loss: {best_val_loss:.5f} | {f'Patience: {early_stopping_counter+1}/{patience}'
-                    #   f" -- Best model {'saved' if save=='best' else ''}" if acc >= best_acc
-                    #   else f" -- Best acc: {best_acc:5.2f} | {f'Patience: {early_stopping_counter+1}/{patience}'
-                      if patience is not None else f'Since: {early_stopping_counter+1}'}",
-                      sep='')
-                
-            if val_loss < best_val_loss:
-                best_val_loss = val_loss
-            # if acc >= best_acc:
-            #     best_acc = acc
+                print(f"Epoch [{epoch+1:>3}/{epochs}] Loss: {train_loss:.5f} | Val loss: {val_loss:.5f} | Acc: {acc:>5.2f}",
+                    f" | LR: {scheduler.get_last_lr()[0]:.6f}" if scheduler is not None else "",
+                    f" -- Best model {'saved' if save=='best' else ''}"
+                    if (val_loss < best_val_loss if step_metric == 'loss' else acc > best_acc)
+                    else f" -- Best {f'val loss: {best_val_loss:.5f}' if step_metric == 'loss' 
+                    else f'acc: {best_acc:.5f}'} | {f'Patience: {early_stopping_counter+1}/{patience}'
+                    if patience is not None else f'Since: {early_stopping_counter+1}'}",
+                    sep='')
+            
+            if step_metric == 'loss' and val_loss < best_val_loss or step_metric == 'accuracy' and acc > best_acc:
                 early_stopping_counter = 0
+                if step_metric == 'loss':
+                    best_val_loss = val_loss
+                else:
+                    best_acc = acc
                 if save=='best':
                     self.save_model(self.save_path)
             else:
@@ -139,7 +147,10 @@ class SignLanguageModelTrainer:
                     print(f"Early stopping after epoch {epoch+1}")
                     break
                 if scheduler is not None and step_per == 'metric' and early_stopping_counter % step_after == 0:
-                    scheduler.step()
+                    if type(scheduler) == optim.lr_scheduler.ReduceLROnPlateau:
+                        scheduler.step(val_loss if step_metric == 'loss' else acc)
+                    else:
+                        scheduler.step()
 
         if save == 'last':
             self.save_model(self.save_path)
@@ -147,7 +158,7 @@ class SignLanguageModelTrainer:
             self.load_model()
         
         duration = str(datetime.timedelta(seconds=int(time()-t)))
-        print(f'Number of epochs: {epoch} | Total duration: {duration}')
+        print(f'Number of epochs: {epoch+1} | Total duration: {duration}')
         
         return train_losses, val_losses
 
@@ -155,7 +166,7 @@ class SignLanguageModelTrainer:
                  val:DataLoader,
                  criterion:nn.modules.loss._Loss=None,
                  is_test:bool=False
-            ) -> float | tuple[float, list[int], list[int]]:
+            ) -> tuple[float, float] | tuple[float, list[int], list[int]]:
         """
         Evaluate the model on validation data.
 
@@ -173,17 +184,17 @@ class SignLanguageModelTrainer:
             for inputs, labels in val:
                 inputs, labels = inputs.to(self.device), labels.to(self.device)
                 outputs = self.model(inputs)
-                if is_test:
-                    predicted = torch.argmax(outputs, 1)
-                    total += labels.size(0)
-                    correct += (predicted == labels).sum().item()
+                predicted = torch.argmax(outputs, 1)
+                total += labels.size(0)
+                correct += (predicted == labels).sum().item()
                     
+                if is_test:
                     y_true.extend(labels.cpu().numpy())
                     y_pred.extend(predicted.cpu().numpy())
                 else:
                     val_loss += criterion(outputs, labels).item()
-            
-        return (100 * correct / total, y_true, y_pred) if is_test else val_loss / len(val)
+        acc, val_loss = 100 * correct / total, val_loss / len(val)
+        return (acc, y_true, y_pred) if is_test else (acc, val_loss)
     
     def predict(self, input:torch.Tensor) -> str:
         self.model.eval()
@@ -191,7 +202,7 @@ class SignLanguageModelTrainer:
             output = self.model(input)
             _, pred_idx = torch.max(output, 1).item()
             return self.classes[pred_idx]
-        
+    
     def confusion_matrix(self, y_true:torch.Tensor, y_pred:torch.Tensor, num_classes:int) -> torch.Tensor:
         """
         Computes the confusion matrix for a multi-class classification problem.

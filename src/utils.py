@@ -11,18 +11,18 @@ from datasets.arrow_dataset import Dataset as HFDataset
 
 # Config
 class Config:
-    DEVICE = torch.device("mps" if torch.mps.is_available() else "cpu")
+    DEVICE = torch.device('cuda' if torch.cuda.is_available() else "mps" if torch.mps.is_available() else "cpu")
     SEED = 42
     DATA_PATH = "Hemg/sign_language_dataset"
     MODEL_SAVE_PATH = {
-        'cnn': 'assets/models/sign_language_cnn2.pth',
-        'tl' : 'assets/models/sign_language_tl2.pth',
-        'vit': 'assets/models/sign_language_vit2.pth',
+        'cnn': 'assets/models/sign_language_cnn.pth',
+        'tl' : 'assets/models/sign_language_tl.pth',
+        'vit': 'assets/models/sign_language_vit.pth',
     }
     OUTPUT_DIR = "assets/outputs"
     
-    pretrained_model = models.resnet50
-    weights = models.ResNet50_Weights.DEFAULT
+    pretrained_model = models.resnet18
+    weights = models.ResNet18_Weights.DEFAULT
     transform = weights.transforms()
     
     VAL_RATIO, TEST_RATIO = 0.15, 0.15
@@ -31,10 +31,13 @@ class Config:
     PRINT_EVERY = 5
     STEP_PER = {'cnn': 'epoch', 'tl': 'epoch', 'vit': 'epoch'}
     STEP_AFTER = 5
+    STEP_METRIC = 'loss'
+    STEP_MODE = {'loss': 'min', 'accuracy': 'max'}
+    STEP_FACTOR = 0.8
     WARMUP_STEPS = 1000
     NB_WORKERS = 0 # Bad for value > 0 on MacOS
-    LR = 0.001
-    LABEL_SMOOTHING = 0.1
+    LR = {'cnn': 0.001, 'tl': 0.001, 'vit': 0.0001}
+    LABEL_SMOOTHING = {'cnn': 0.025, 'tl': 0.025, 'vit': 0.025}
     BETAS = (0.9, 0.98)
     EPS = 1e-9
     SAVE_MODEL = 'best' # 'best' or 'last'
@@ -44,7 +47,7 @@ class Config:
     BATCH_SIZE = 32
     PATCH_SIZE = 16
     
-    D_MODEL = 512
+    D_MODEL = 320
     NB_HEADS = D_MODEL // 64
     FFN_HIDDEN_SIZE = D_MODEL * 4
     NB_LAYERS = 6
@@ -68,17 +71,6 @@ def scaled_dot_product_attention(q:torch.Tensor, k:torch.Tensor, v:torch.Tensor,
 
 
 # Performance
-class ViTLoss(nn.Module):
-    def __init__(self, label_smoothing:float=0.0, **kwargs) -> None:
-        super().__init__()
-        self.loss_func = nn.CrossEntropyLoss(label_smoothing = label_smoothing, **kwargs)
-
-    def forward(self, logits: torch.Tensor, labels: torch.Tensor) -> torch.Tensor:
-        num_classes = logits.shape[-1]
-        logits = logits.reshape(-1, num_classes)
-        labels = labels.reshape(-1).long()
-        return self.loss_func(logits, labels)
-    
 class Scheduler(optim.lr_scheduler._LRScheduler):
     def __init__(self, 
                  optimizer: optim.Optimizer,

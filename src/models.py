@@ -87,27 +87,29 @@ class SignLanguageTL(nn.Module):
         """
         self.base_model = base_model(weights=weights)
 
-        # Freeze all layers
-        for param in self.base_model.parameters():
-            param.requires_grad = False
+        # # Freeze all layers
+        # for param in self.base_model.parameters():
+        #     param.requires_grad = False
         
-        # Unfreeze the parameters of the last few layers for fine-tuning
-        for param in self.base_model.layer4.parameters():
-            param.requires_grad = True
+        # # Unfreeze the parameters of the last few layers for fine-tuning
+        # for param in self.base_model.layer4.parameters():
+        #     param.requires_grad = True
 
         # Replace the fully connected layer
         in_features = self.base_model.fc.in_features
-        # self.base_model.fc = nn.Linear(in_features, n_classes)
-        self.base_model.fc = nn.Sequential(
-            nn.Dropout(0.25),
-            nn.Linear(in_features, 512),
-            nn.ReLU(),
-            nn.Dropout(0.25),
-            nn.Linear(512, n_classes)
-        )
+        self.base_model.fc = nn.Linear(in_features, n_classes)
+        # self.base_model.fc = nn.Sequential(
+        #     nn.Dropout(0.25),
+        #     nn.Linear(in_features, 512),
+        #     nn.ReLU(),
+        #     nn.Dropout(0.5),
+        #     nn.Linear(512, n_classes)
+        # )
         
     def forward(self, x:torch.Tensor) -> torch.Tensor:
         x = self.base_model(x)
+        # x = self.features(x)
+        # x = self.fc(x)
         return x
     
     
