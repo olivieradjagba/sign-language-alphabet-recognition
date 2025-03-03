@@ -6,6 +6,14 @@ Sign language is a crucial mode of communication for the deaf and hard-of-hearin
 
 This project aims to classify sign language alphabets and digits using three different deep learning models: a Convolutional Neural Network (CNN), a Transfer Learning model based on ResNet18, and a Vision Transformer (ViT) model built from scratch. By comparing their performance, we aim to identify the most effective approach for sign language classification.
 
+## Dataset
+
+The dataset used for this project is the ASL dataset from Hugging Face, available [here](https://huggingface.co/datasets/Hemg/sign_language_dataset). It can also be found on Kaggle [here](https://www.kaggle.com/datasets/ayuraj/asl-dataset). The dataset has been split into three parts:
+
+-   70% Training Set
+-   15% Validation Set
+-   15% Testing Set
+
 ## Models Overview
 
 ### 1. CNN Model
@@ -26,7 +34,7 @@ All models were trained on a MacBook Pro M3's GPU (Metal). Training was conducte
 
 ## Model Performance
 
-The table below summarizes the performance of each model, including accuracy, number of epochs required to achieve it, and total training time. The number of epochs listed for each model includes the 20 patience epochs.
+The table below summarizes the performance of each model, including test set accuracy, number of epochs required to achieve it, and total training time. The number of epochs listed for each model includes the 20 patience epochs.
 
 | Model Type                   | Accuracy | Epochs | Training Time |
 | ---------------------------- | -------- | ------ | ------------- |
@@ -49,6 +57,21 @@ Below are the confusion matrices for each model, providing insights into their c
 ### Vision Transformer Model Confusion Matrix
 
 ![ViT confusion matrix](assets/outputs/cm_vit_96.83.png)
+
+Observations from the confusion matrices for each model:
+
+-   CNN: The most confusion occurred between "o" and "O" (20%).
+-   ResNet18 (TL):
+
+    -   "o" was confused with "0" (20%).
+    -   "0" was confused with "o" (9%).
+    -   "5" was confused with "4" (20%).
+
+-   ViT:
+
+    -   "0" and "o" had mutual confusion (10% "o" with "0" and 9% "0" with "o").
+    -   "5" was confused with "4" (30%).
+    -   "6" was confused with "w" (27%).
 
 ## Conclusion
 
